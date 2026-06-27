@@ -216,3 +216,31 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── Terraform ──────────────────────────────────────────────
+# Local .terraform directories (provider/module cache, backend pointer)
+**/.terraform/*
+
+# State files — NEVER commit (may contain secrets in plaintext)
+*.tfstate
+*.tfstate.*
+errored.tfstate
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Variable files that may hold secrets
+*.tfvars
+*.tfvars.json
+!example.tfvars
+
+# CLI config / override files
+.terraformrc
+terraform.rc
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Keep the provider lock file in version control (do NOT ignore .terraform.lock.hcl)
