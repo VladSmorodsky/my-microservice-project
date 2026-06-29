@@ -24,5 +24,5 @@ variable "force_delete" {
 variable "environment" {
   description = "Environment tag"
   type        = string
-  default     = "lesson-5"
+  default     = "lesson-7"
 }
