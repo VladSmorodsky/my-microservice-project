@@ -92,9 +92,11 @@ Outputs: `s3_bucket_name`, `dynamodb_table_name`.
 - **`aws_vpc`** — CIDR `10.0.0.0/16`, DNS-підтримка та DNS-імена.
 - **`aws_subnet`** — 3 публічні (`map_public_ip_on_launch = true`) і 3 приватні підмережі.
 - **`aws_internet_gateway`** + таблиця маршрутів (`0.0.0.0/0 → IGW`) для публічних підмереж.
+- **`aws_nat_gateway`** + EIP (`nat.tf`) — вихідний інтернет для **приватних** підмереж
+  (`0.0.0.0/0 → NAT`); один NAT для економії. Вимикається змінною `enable_nat_gateway = false`.
 
-Змінні: `vpc_cidr_block`, `public_subnets`, `private_subnets`, `availability_zones`, `vpc_name`.
-Outputs: `vpc_id`, `public_subnets`, `private_subnets`, `internet_gateway_id`.
+Змінні: `vpc_cidr_block`, `public_subnets`, `private_subnets`, `availability_zones`, `vpc_name`, `enable_nat_gateway`.
+Outputs: `vpc_id`, `public_subnets`, `private_subnets`, `internet_gateway_id`, `nat_gateway_id`.
 
 > ℹ️ `availability_zones` мають належати регіону провайдера (`us-east-1a/b/c`).
 
@@ -116,8 +118,8 @@ Outputs: `repository_url`, `repository_arn`, `repository_name`.
   (`AmazonEKSWorkerNodePolicy`, `AmazonEKS_CNI_Policy`, `AmazonEC2ContainerRegistryReadOnly`).
 - **`aws_eks_cluster`** — control plane у підмережах VPC; `bootstrap_cluster_creator_admin_permissions = true`
   дає творцю кластера admin-доступ (kubectl працює одразу).
-- **`aws_eks_node_group`** — керована група вузлів у **публічних** підмережах
-  (вихід в інтернет через IGW, без платного NAT).
+- **`aws_eks_node_group`** — керована група вузлів у **приватних** підмережах
+  (без публічних IP; вихідний інтернет — через NAT Gateway у VPC-модулі).
 
 Змінні: `cluster_name`, `kubernetes_version` (default `null` → версія AWS),
 `subnet_ids`, `node_subnet_ids`, `node_instance_types`, `desired_size`/`min_size`/`max_size`, `environment`.
@@ -140,7 +142,8 @@ docker push "$REPO:latest"
 
 Чарт [helm/django-app](helm/django-app) реалізує:
 
-- **Deployment** — образ Django з ECR, env-змінні через `envFrom` (ConfigMap + Secret);
+- **Deployment** — образ Django з ECR, env через `envFrom` (ConfigMap + Secret),
+  **liveness/readiness проби** (HTTP `GET /`, порт 8000);
 - **Service** типу `LoadBalancer` — зовнішній доступ (ELB, порт 80 → 8000);
 - **HPA** — масштабування подів **2 → 6** при CPU **> 70%**;
 - **ConfigMap** — несекретні env-змінні (`DEBUG`, `ALLOWED_HOSTS`, `DATABASE_*`);
@@ -194,5 +197,8 @@ terraform destroy
 | EKS control plane | ~$0.10/год (~$73/міс) |
 | Вузли (2× t3.medium) | ~$60/міс |
 | LoadBalancer (ELB) | ~$18/міс + трафік |
+| NAT Gateway | ~$32/міс + плата за трафік |
 
 Тому після експериментів обов'язково робіть `terraform destroy` (та `helm uninstall` перед ним).
+NAT Gateway можна вимкнути окремо (`enable_nat_gateway = false`), але тоді вузли в приватних
+підмережах втратять вихід в інтернет — тож вимикайте лише разом з усім кластером.

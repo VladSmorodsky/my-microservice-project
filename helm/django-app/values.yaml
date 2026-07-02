@@ -9,7 +9,7 @@ containerPort: 8000
 
 service:
   type: LoadBalancer
-  port: 80          # external port on the LoadBalancer
+  port: 80
 
 autoscaling:
   enabled: true
@@ -24,6 +24,26 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
 
 # Non-sensitive environment variables for Django (migrated from Topic 4).
 # Rendered into a ConfigMap and injected via envFrom.

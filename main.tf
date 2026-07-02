@@ -26,7 +26,7 @@ module "eks" {
 
   subnet_ids = concat(module.vpc.public_subnets, module.vpc.private_subnets)
 
-  node_subnet_ids = module.vpc.public_subnets
+  node_subnet_ids = module.vpc.private_subnets
 
   environment = var.environment
 }
