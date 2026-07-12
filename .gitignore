@@ -244,3 +244,8 @@ override.tf.json
 *_override.tf.json
 
 # Keep the provider lock file in version control (do NOT ignore .terraform.lock.hcl)
+
+# ── Helm secret values (never commit real secrets) ─────────
+secrets.values.yaml
+*.secrets.yaml
+secret.values.yaml

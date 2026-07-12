@@ -1,0 +1,66 @@
+replicaCount: 2
+
+image:
+  repository: 590183992909.dkr.ecr.us-east-1.amazonaws.com/my-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+containerPort: 8000
+
+service:
+  type: LoadBalancer
+  port: 80
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Non-sensitive environment variables for Django (migrated from Topic 4).
+# Rendered into a ConfigMap and injected via envFrom.
+config:
+  DEBUG: "False"
+  ALLOWED_HOSTS: "*"
+  DATABASE_NAME: "docker_project"
+  DATABASE_USER: "myuser"
+  DATABASE_HOST: "localhost"
+  DATABASE_PORT: "5432"
+
+# Sensitive environment variables — rendered into a Kubernetes Secret.
+# Do NOT put real values here / commit them. Pass them at install time, e.g.:
+#   helm install django-app helm/django-app \
+#     --set secrets.SECRET_KEY="$SECRET_KEY" \
+#     --set secrets.DATABASE_PASSWORD="$DATABASE_PASSWORD"
+# or via a separate, git-ignored file:  -f secrets.values.yaml
+secrets:
+  SECRET_KEY: ""
+  DATABASE_PASSWORD: ""

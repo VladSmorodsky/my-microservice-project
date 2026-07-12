@@ -1,0 +1,14 @@
+Django app deployed as release "{{ .Release.Name }}".
+
+1. Wait for the LoadBalancer to get an external address:
+
+   kubectl get svc {{ include "django-app.fullname" . }} -w
+
+2. Open the app (use the EXTERNAL-IP / hostname shown above):
+
+   http://<EXTERNAL-IP>:{{ .Values.service.port }}/
+
+3. Inspect autoscaling (requires metrics-server in the cluster):
+
+   kubectl get hpa {{ include "django-app.fullname" . }}
+   kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}

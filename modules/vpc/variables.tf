@@ -22,3 +22,9 @@ variable "vpc_name" {
   description = "VPC Name"
   type        = string
 }
+
+variable "enable_nat_gateway" {
+  description = "Create a NAT Gateway so private-subnet nodes get outbound internet"
+  type        = bool
+  default     = true
+}

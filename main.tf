@@ -2,6 +2,7 @@ module "s3_backend" {
   source      = "./modules/s3-backend"
   bucket_name = "terraform-state-bucket-000002"
   table_name  = "terraform-locks"
+  environment = var.environment
 }
 
 module "vpc" {
@@ -16,4 +17,16 @@ module "vpc" {
 module "ecr" {
   source          = "./modules/ecr"
   repository_name = "my-app"
+  environment     = var.environment
+}
+
+module "eks" {
+  source       = "./modules/eks"
+  cluster_name = "my-eks"
+
+  subnet_ids = concat(module.vpc.public_subnets, module.vpc.private_subnets)
+
+  node_subnet_ids = module.vpc.private_subnets
+
+  environment = var.environment
 }

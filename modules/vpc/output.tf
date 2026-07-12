@@ -17,3 +17,8 @@ output "internet_gateway_id" {
   description = "ID Internet Gateway"
   value       = aws_internet_gateway.igw.id
 }
+
+output "nat_gateway_id" {
+  description = "ID of the NAT Gateway (null if disabled)"
+  value       = try(aws_nat_gateway.this[0].id, null)
+}
