@@ -126,8 +126,5 @@ spec:
         failure {
             echo "Pipeline FAILED! Check logs for details."
         }
-        always {
-            cleanWs()
-        }
     }
 }
