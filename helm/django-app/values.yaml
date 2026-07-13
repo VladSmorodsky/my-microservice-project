@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: 590183992909.dkr.ecr.us-east-1.amazonaws.com/my-app
-  tag: latest
+  tag: 6
   pullPolicy: IfNotPresent
 
 imagePullSecrets:
