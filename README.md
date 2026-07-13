@@ -297,6 +297,135 @@ terraform output
 
 ---
 
+## ✅ Як застосувати та перевірити CI/CD
+
+Цей розділ описує повний цикл: **Terraform → Jenkins → Argo CD**.
+
+### 1. Як застосувати Terraform
+
+```bash
+# 1. Ініціалізація (провайдери + backend)
+terraform init
+
+# 2. (перший запуск) Bootstrap S3 backend
+terraform apply -target=module.s3_backend
+# розкоментувати backend.tf, потім:
+terraform init -migrate-state
+
+# 3. Переглянути, що буде створено
+terraform plan
+
+# 4. Застосувати всю інфраструктуру (VPC, EKS, ECR, Jenkins, Argo CD) — 15-20 хв
+terraform apply        # підтвердити: yes
+
+# 5. Зберегти та переглянути outputs
+terraform output
+```
+
+**Перевірка, що Terraform відпрацював успішно:**
+
+```bash
+# Підключитись до створеного EKS-кластера
+aws eks update-kubeconfig --region us-east-1 --name my-eks
+
+# Ноди мають бути у стані Ready
+kubectl get nodes
+
+# Jenkins та Argo CD мають бути Running
+kubectl get pods -n jenkins
+kubectl get pods -n argocd
+```
+
+Очікуваний результат: `terraform apply` завершується без помилок (`Apply complete!`), ноди у статусі `Ready`, поди Jenkins і Argo CD — `Running`.
+
+---
+
+### 2. Як перевірити Jenkins job
+
+```bash
+# Відкрити доступ до Jenkins UI
+kubectl port-forward -n jenkins svc/jenkins 8080:80
+
+# Пароль адміністратора
+terraform output -raw jenkins_admin_password
+
+# Браузер: http://localhost:8080  (логін: admin)
+```
+
+**Запуск та перевірка job `django-app-pipeline`:**
+
+1. Зробити `git push` у гілку `main` (або натиснути **Build Now** у джобі).
+2. У Jenkins UI відкрити **django-app-pipeline → останній білд**.
+3. Перевірити **Stage View** — усі 3 стадії мають бути зелені:
+   - **Checkout Source** — клонування репозиторію
+   - **Build Docker Image** — Kaniko збирає образ і пушить у ECR (`my-app:BUILD_NUMBER` + `latest`)
+   - **Update Helm Values** — оновлює `helm/django-app/values.yaml` і робить commit у `main`
+4. Відкрити **Console Output** — наприкінці має бути банер `PIPELINE COMPLETED SUCCESSFULLY! ✅`.
+
+**Перевірка результату job через CLI:**
+
+```bash
+# Новий образ з тегом = номер білда з'явився в ECR
+aws ecr describe-images --repository-name my-app --region us-east-1 \
+  --query 'sort_by(imageDetails,&imagePushedAt)[-1].imageTags'
+
+# Jenkins зробив автоматичний commit "ci: update my-app image tag ..."
+git log --oneline -5
+```
+
+Очікуваний результат: білд зелений, у ECR новий тег, у git — автоматичний commit від `Jenkins CI` з новим тегом у `values.yaml`.
+
+---
+
+### 3. Як побачити результат в Argo CD
+
+```bash
+# Відкрити доступ до Argo CD UI
+kubectl port-forward -n argocd svc/argocd-server 8081:80
+
+# Пароль адміністратора
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d
+
+# Браузер: http://localhost:8081  (логін: admin)
+```
+
+**Перевірка синхронізації застосунку `django-app`:**
+
+1. В Argo CD UI відкрити застосунок **django-app**.
+2. Після commit від Jenkins (авто-sync ~3 хв) статуси мають стати:
+   - **Sync Status: `Synced`** — Git = кластер
+   - **Health Status: `Healthy`** — поди піднялись
+3. На діаграмі ресурсів видно нову ревізію Deployment з оновленим тегом образу.
+4. Кнопка **Refresh** / **Sync** — щоб синхронізувати вручну, не чекаючи 3 хв.
+
+**Перевірка через CLI:**
+
+```bash
+# Статус застосунку в Argo CD
+kubectl get application django-app -n argocd
+
+# Поди перерозгорнулись з новим образом
+kubectl get pods -n default
+kubectl get deployment django-app-django-app -n default \
+  -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Примусовий hard-refresh, якщо sync не відбувся
+kubectl patch application django-app -n argocd --type merge \
+  -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+```
+
+Очікуваний результат: застосунок `django-app` у стані `Synced` + `Healthy`, поди у `default` перезапущені з образом, тег якого збігається з номером білда Jenkins.
+
+**Доступ до самого застосунку:**
+
+```bash
+kubectl get svc -n default django-app-django-app   # взяти EXTERNAL-IP (LoadBalancer)
+```
+> ⚠️ Застосунок повертає HTTP 500 (БД не налаштована), але це підтверджує, що CI/CD-ланцюг Terraform → Jenkins → Argo CD відпрацював повністю.
+
+---
+
 ## 🔐 Secrets Management
 
 **Current state:** Demo secrets in `values.yaml` (⚠️ NOT secure for production)
@@ -338,7 +467,6 @@ See [SECRETS_MANAGEMENT.md](SECRETS_MANAGEMENT.md) for details.
 - Sync Policy: Automated
   - Prune: true
   - Self-heal: true
-- Sync Interval: ~3 minutes
 
 ---
 
@@ -422,21 +550,5 @@ terraform destroy
 - [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) - Detailed step-by-step guide
 - [SECRETS_MANAGEMENT.md](SECRETS_MANAGEMENT.md) - Security best practices
 - [JENKINS_ARGOCD_SETUP.md](JENKINS_ARGOCD_SETUP.md) - CI/CD configuration details
-
----
-
-## 🎯 Learning Outcomes
-
-This project demonstrates:
-
-✅ **Infrastructure as Code** - Terraform modules
-✅ **Container Orchestration** - Kubernetes (EKS)
-✅ **CI/CD Pipeline** - Jenkins + ArgoCD
-✅ **GitOps** - Declarative deployments
-✅ **Security** - Secrets management, RBAC
-✅ **Monitoring** - Readiness/Liveness probes
-✅ **Scaling** - Horizontal Pod Autoscaler
-✅ **Networking** - VPC, subnets, LoadBalancer
-✅ **Container Registry** - ECR with scanning
 
 ---
