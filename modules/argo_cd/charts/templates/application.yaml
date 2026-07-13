@@ -26,6 +26,14 @@ spec:
     server: {{ .destination.server }}
     namespace: {{ .destination.namespace }}
 
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: django-app-django-app-secret
+      jsonPointers:
+        - /data
+        - /stringData
+
   syncPolicy:
     automated:
       prune: {{ .syncPolicy.automated.prune | default true }}
