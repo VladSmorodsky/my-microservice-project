@@ -14,6 +14,13 @@ spec:
     repoURL: {{ .source.repoURL }}
     targetRevision: {{ .source.targetRevision }}
     path: {{ .source.path }}
+    helm:
+      {{- if .source.helm }}
+      {{- if .source.helm.values }}
+      values: |
+{{ .source.helm.values | indent 8 }}
+      {{- end }}
+      {{- end }}
 
   destination:
     server: {{ .destination.server }}
