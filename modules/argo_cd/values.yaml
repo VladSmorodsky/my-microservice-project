@@ -1,0 +1,37 @@
+global:
+  domain: ${domain}
+
+server:
+  service:
+    type: ${service_type}
+
+  extraArgs:
+    - --insecure
+
+configs:
+  params:
+    server.insecure: true
+
+  cm:
+    url: https://${domain}
+
+    # Enable Application in any namespace
+    application.instanceLabelKey: argocd.argoproj.io/instance
+
+redis-ha:
+  enabled: false
+
+controller:
+  replicas: 1
+
+repoServer:
+  replicas: 1
+
+applicationSet:
+  enabled: true
+
+dex:
+  enabled: false
+
+notifications:
+  enabled: false

@@ -1,0 +1,13 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars and customize as needed
+# Note: terraform.tfvars is ignored by Git for security
+
+# Environment name (used for tagging)
+environment = "dev"
+
+# Optional: Override Jenkins admin password
+# If not set, a random secure password will be generated automatically
+# jenkins_admin_password = "YourSecurePassword123!"
+
+# Note: To get the generated password after terraform apply, run:
+# terraform output -raw jenkins_admin_password

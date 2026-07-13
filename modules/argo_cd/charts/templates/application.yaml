@@ -1,0 +1,34 @@
+{{- range .Values.applications }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name }}
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: {{ .source.repoURL }}
+    targetRevision: {{ .source.targetRevision }}
+    path: {{ .source.path }}
+
+  destination:
+    server: {{ .destination.server }}
+    namespace: {{ .destination.namespace }}
+
+  syncPolicy:
+    automated:
+      prune: {{ .syncPolicy.automated.prune | default true }}
+      selfHeal: {{ .syncPolicy.automated.selfHeal | default true }}
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+{{- end }}

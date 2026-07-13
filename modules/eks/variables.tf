@@ -48,3 +48,9 @@ variable "environment" {
   type        = string
   default     = "lesson-7"
 }
+
+variable "ebs_csi_driver_version" {
+  description = "Версія EBS CSI Driver addon"
+  type        = string
+  default     = "v1.62.0-eksbuild.1"
+}

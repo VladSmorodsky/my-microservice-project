@@ -1,0 +1,19 @@
+repositories:
+  - name: helm-charts
+    url: ${helm_repo_url}
+    type: git
+
+applications:
+  - name: django-app
+    namespace: default
+    source:
+      repoURL: ${helm_repo_url}
+      targetRevision: main
+      path: helm/django-app
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: default
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
