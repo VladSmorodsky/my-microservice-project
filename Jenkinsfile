@@ -60,8 +60,8 @@ spec:
                         echo "Building image: ${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
                         sh """
                             /kaniko/executor \
-                              --context=${WORKSPACE} \
-                              --dockerfile=${WORKSPACE}/Dockerfile \
+                              --context=${WORKSPACE}/django \
+                              --dockerfile=${WORKSPACE}/django/Dockerfile \
                               --destination=${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
                               --destination=${ECR_REGISTRY}/${IMAGE_NAME}:latest \
                               --cache=true \
