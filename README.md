@@ -1,204 +1,442 @@
-# my-microservice-project
+# 🚀 Django CI/CD Infrastructure on AWS EKS
 
-Навчальний DevOps-проєкт: повний цикл розгортання Django-застосунку в AWS.
-Інфраструктура описана через **Terraform** (модульний підхід), а сам застосунок
-розгортається в **Kubernetes (EKS)** через **Helm**.
+Повноцінна **CI/CD інфраструктура** для Django застосунку з автоматичним деплоєм в Kubernetes.
 
-Що створюється:
+## 📊 Що створюється
 
-- **S3 + DynamoDB** — бекенд для стану Terraform і блокування;
-- **VPC** — мережа з публічними/приватними підмережами та Internet Gateway;
-- **ECR** — реєстр Docker-образів зі скануванням і шифруванням;
-- **EKS** — кластер Kubernetes у цьому VPC з керованою групою вузлів;
-- **Helm-чарт** — Deployment + Service (LoadBalancer) + HPA + ConfigMap + Secret для Django.
+### Infrastructure (Terraform)
+- **VPC** — мережа з 3 AZs (public + private subnets)
+- **EKS** — Kubernetes cluster з 2 nodes
+- **ECR** — Docker registry з шифруванням
+- **S3 + DynamoDB** — Terraform state backend
 
-## Структура проєкту
+### CI/CD Pipeline
+- **Jenkins** — CI з Kubernetes agents (Kaniko + Git)
+- **ArgoCD** — GitOps CD з auto-sync
+- **Kaniko** — Rootless Docker builds в Kubernetes
+- **LoadBalancer** — AWS ELB для зовнішнього доступу
+
+### Application
+- **Django** — Web application з Gunicorn
+- **Helm Chart** — Kubernetes deployment config
+- **Auto-scaling** — HPA (2-6 pods, CPU 70%)
+
+---
+
+## 🏗️ Архітектура
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      CI/CD Flow                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Developer                                                   │
+│      ↓                                                       │
+│  Git Push → GitHub                                           │
+│      ↓                                                       │
+│  Jenkins Pipeline (Kubernetes Pod)                           │
+│      ├─ Kaniko container: Build Docker image                │
+│      ├─ Push to ECR: my-app:BUILD_NUMBER                    │
+│      └─ Git container: Update values.yaml → Push            │
+│      ↓                                                       │
+│  GitHub (updated values.yaml)                                │
+│      ↓                                                       │
+│  ArgoCD (auto-sync ~3 min)                                   │
+│      ├─ Detect Git changes                                   │
+│      ├─ Sync Helm chart                                      │
+│      └─ Rolling update pods                                  │
+│      ↓                                                       │
+│  Kubernetes                                                  │
+│      └─ Django pods (2) + LoadBalancer                       │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📁 Структура проєкту
 
 ```
 my-microservice-project/
-├── backend.tf            # Remote S3-бекенд (за замовчуванням ВИМКНЕНИЙ/закоментований)
-├── providers.tf          # Провайдер AWS (us-east-1), pin версії (~> 6.0)
-├── variables.tf          # Коренева змінна environment (єдине джерело правди)
-├── main.tf               # Підключає модулі s3-backend, vpc, ecr, eks
-├── outputs.tf            # Зведені outputs
-├── django/               # Django-застосунок із теми 4 (Dockerfile, код)
+├── main.tf                   # Root Terraform config
+├── providers.tf              # AWS, Kubernetes, Helm providers
+├── variables.tf              # Environment variable
+├── outputs.tf                # Infrastructure outputs
+├── backend.tf                # S3 backend (commented for bootstrap)
+│
 ├── modules/
-│   ├── s3-backend/       # S3-бакет + DynamoDB для стану/локів Terraform
-│   ├── vpc/              # VPC, public/private підмережі, IGW, маршрути
-│   ├── ecr/              # ECR-репозиторій (scan + encryption + policy)
-│   └── eks/              # EKS-кластер + IAM-ролі + node group
-└── helm/django-app/      # Helm-чарт застосунку Django
+│   ├── s3-backend/           # S3 + DynamoDB for Terraform state
+│   ├── vpc/                  # VPC, subnets, IGW, NAT
+│   ├── ecr/                  # Docker registry
+│   ├── eks/                  # Kubernetes cluster + EBS CSI driver
+│   ├── jenkins/              # Jenkins Helm deployment
+│   │   ├── jenkins.tf        # Helm release
+│   │   ├── values.yaml       # Jenkins config (Kaniko agents)
+│   │   └── variables.tf      # Module variables
+│   └── argo_cd/              # ArgoCD Helm deployment
+│       ├── argo_cd.tf        # Helm release
+│       ├── values.yaml       # ArgoCD config
+│       └── charts/           # ArgoCD Application chart
+│           ├── Chart.yaml
+│           ├── values.yaml   # Application definition
+│           └── templates/
+│               └── application.yaml
+│
+├── django/                   # Django application
+│   ├── Dockerfile            # Multi-stage build
+│   ├── requirements.txt
+│   ├── manage.py
+│   └── docker_project/
+│       └── settings.py       # Reads from os.environ
+│
+├── helm/django-app/          # Helm chart for Django
+│   ├── Chart.yaml
+│   ├── values.yaml           # Updated by Jenkins Pipeline
+│   └── templates/
+│       ├── deployment.yaml   # Pods config
+│       ├── service.yaml      # LoadBalancer
+│       ├── configmap.yaml    # Non-sensitive env vars
+│       ├── secret.yaml       # Sensitive env vars
+│       └── hpa.yaml          # Auto-scaling
+│
+├── Jenkinsfile               # CI Pipeline definition
+├── DEPLOYMENT_GUIDE.md       # Detailed setup instructions
+├── SECRETS_MANAGEMENT.md     # Security best practices
+└── README.md                 # This file
 ```
 
-## Передумови
+---
 
-- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.5
-- AWS CLI з налаштованими креденшіалами: `aws configure` → `aws sts get-caller-identity`
-- `kubectl`, `helm`, `docker` (для деплою застосунку)
-- Регіон за замовчуванням — `us-east-1` (у `providers.tf`).
+## 🎯 Передумови
 
-## Конфігурація середовища
+### Required:
+- **Terraform** >= 1.5
+- **AWS CLI** налаштований: `aws configure`
+- **kubectl** для Kubernetes
+- **Git** для version control
 
-Тег середовища задається **в одному місці** — кореневий [variables.tf](variables.tf):
+### Optional (for manual testing):
+- **Docker** для локальної розробки
+- **Helm** для ручного deploy
+- **GitHub Personal Access Token** для Jenkins
 
-```hcl
-variable "environment" {
-  default = "lesson-7"
-}
-```
+---
 
-Значення пробрасується в усі модулі (`s3-backend`, `ecr`, `eks`). Щоб змінити —
-правте лише цей файл або `terraform apply -var="environment=lesson-8"`.
+## 🚀 Quick Start
 
-## Команди Terraform
+### 1️⃣ Підготовка
 
 ```bash
-terraform init       # завантажує провайдери/модулі, налаштовує бекенд
-terraform plan       # показує план змін без застосування
-terraform apply      # створює інфраструктуру (підтвердження: yes)
-terraform destroy    # знищує всі ресурси (підтвердження: yes)
+# Clone repository
+git clone https://github.com/VladSmorodsky/my-microservice-project
+cd my-microservice-project
+
+# Configure AWS credentials
+aws configure
+aws sts get-caller-identity  # Verify
 ```
 
-Корисні outputs:
+### 2️⃣ Bootstrap S3 Backend
 
 ```bash
-terraform output ecr_repository_url       # URL ECR для docker push
-terraform output eks_kubeconfig_command   # команда налаштування kubectl
+# Backend is commented by default (chicken-egg problem)
+# Initialize with local state
+terraform init
+
+# Create S3 backend resources only
+terraform apply -target=module.s3_backend
+
+# Uncomment backend.tf
+# sed -i '' 's/^# //g' backend.tf  # macOS
+# OR manually uncomment lines in backend.tf
+
+# Migrate state to S3
+terraform init -migrate-state
 ```
 
-## Опис модулів
-
-### `s3-backend`
-
-Інфраструктура для зберігання **стану Terraform**:
-
-- **`aws_s3_bucket`** — бакет стану з версіонуванням, `BucketOwnerEnforced`,
-  **шифруванням SSE (AES256)** та **блокуванням публічного доступу**
-  (`aws_s3_bucket_public_access_block`, усі 4 прапори). `force_destroy = true`.
-- **`aws_dynamodb_table`** — `terraform-locks` (`LockID`, `PAY_PER_REQUEST`) для блокування стану.
-
-Змінні: `bucket_name`, `table_name`, `environment`.
-Outputs: `s3_bucket_name`, `dynamodb_table_name`.
-
-> ⚠️ **Bootstrap-нюанс.** Ці ресурси і є бекендом, у якому Terraform зберігає свій
-> стан, тому блок `backend "s3"` у `backend.tf` за замовчуванням **закоментований**
-> (проблема «курки і яйця»). Порядок: спершу `apply` з локальним станом створює
-> бекенд → розкоментовуєте блок → `terraform init -migrate-state`.
-> **Перед `destroy`** робіть зворотне (мігруйте стейт у локальний), інакше знищення
-> бакета/таблиці зламає збереження стану.
-
-### `vpc`
-
-- **`aws_vpc`** — CIDR `10.0.0.0/16`, DNS-підтримка та DNS-імена.
-- **`aws_subnet`** — 3 публічні (`map_public_ip_on_launch = true`) і 3 приватні підмережі.
-- **`aws_internet_gateway`** + таблиця маршрутів (`0.0.0.0/0 → IGW`) для публічних підмереж.
-- **`aws_nat_gateway`** + EIP (`nat.tf`) — вихідний інтернет для **приватних** підмереж
-  (`0.0.0.0/0 → NAT`); один NAT для економії. Вимикається змінною `enable_nat_gateway = false`.
-
-Змінні: `vpc_cidr_block`, `public_subnets`, `private_subnets`, `availability_zones`, `vpc_name`, `enable_nat_gateway`.
-Outputs: `vpc_id`, `public_subnets`, `private_subnets`, `internet_gateway_id`, `nat_gateway_id`.
-
-> ℹ️ `availability_zones` мають належати регіону провайдера (`us-east-1a/b/c`).
-
-### `ecr`
-
-- **`aws_ecr_repository`** — сканування образів (`scan_on_push = true`),
-  **шифрування at-rest (AES256)**, `force_delete = true`.
-- **`aws_ecr_repository_policy`** — доступ pull/push для IAM-принципалів акаунту.
-
-Змінні: `repository_name`, `scan_on_push`, `image_tag_mutability` (default `MUTABLE`),
-`force_delete`, `environment`.
-Outputs: `repository_url`, `repository_arn`, `repository_name`.
-
-### `eks`
-
-Кластер Kubernetes **у вже існуючому VPC**:
-
-- **IAM-ролі** для control plane (`AmazonEKSClusterPolicy`) та вузлів
-  (`AmazonEKSWorkerNodePolicy`, `AmazonEKS_CNI_Policy`, `AmazonEC2ContainerRegistryReadOnly`).
-- **`aws_eks_cluster`** — control plane у підмережах VPC; `bootstrap_cluster_creator_admin_permissions = true`
-  дає творцю кластера admin-доступ (kubectl працює одразу).
-- **`aws_eks_node_group`** — керована група вузлів у **приватних** підмережах
-  (без публічних IP; вихідний інтернет — через NAT Gateway у VPC-модулі).
-
-Змінні: `cluster_name`, `kubernetes_version` (default `null` → версія AWS),
-`subnet_ids`, `node_subnet_ids`, `node_instance_types`, `desired_size`/`min_size`/`max_size`, `environment`.
-Outputs: `cluster_name`, `cluster_endpoint`, `cluster_certificate_authority`,
-`cluster_security_group_id`, `kubeconfig_command`.
-
-## Збірка та публікація образу в ECR
+### 3️⃣ Deploy Infrastructure
 
 ```bash
-REGION=us-east-1
-REPO=$(terraform output -raw ecr_repository_url)
+# Review plan
+terraform plan
 
-aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin "${REPO%/*}"
-docker build --platform linux/amd64 -t my-app:latest ./django   # amd64 обов'язково для вузлів EKS!
-docker tag my-app:latest "$REPO:latest"
-docker push "$REPO:latest"
+# Deploy (15-20 min)
+terraform apply
+
+# Save outputs
+terraform output > outputs.txt
 ```
 
-## Розгортання застосунку (Helm)
+**What gets created:**
+- VPC with 6 subnets across 3 AZs
+- EKS cluster (my-eks) with 2 t3.medium nodes
+- ECR repository (my-app)
+- Jenkins with Kaniko agents
+- ArgoCD with auto-sync enabled
 
-Чарт [helm/django-app](helm/django-app) реалізує:
-
-- **Deployment** — образ Django з ECR, env через `envFrom` (ConfigMap + Secret),
-  **liveness/readiness проби** (HTTP `GET /`, порт 8000);
-- **Service** типу `LoadBalancer` — зовнішній доступ (ELB, порт 80 → 8000);
-- **HPA** — масштабування подів **2 → 6** при CPU **> 70%**;
-- **ConfigMap** — несекретні env-змінні (`DEBUG`, `ALLOWED_HOSTS`, `DATABASE_*`);
-- **Secret** — чутливі змінні (`SECRET_KEY`, `DATABASE_PASSWORD`).
+### 4️⃣ Configure kubectl
 
 ```bash
-# 1. Налаштувати kubectl на кластер
+# Connect to EKS
 aws eks update-kubeconfig --region us-east-1 --name my-eks
+
+# Verify
 kubectl get nodes
-
-# 2. metrics-server (потрібен для HPA — на EKS не встановлений за замовчуванням)
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-
-# 3. Деплой (секрети передаються ззовні, НЕ комітяться)
-helm install django-app helm/django-app \
-  --set secrets.SECRET_KEY="$SECRET_KEY" \
-  --set secrets.DATABASE_PASSWORD="$DATABASE_PASSWORD"
-
-# 4. Дочекатись зовнішньої адреси LoadBalancer
-kubectl get svc django-app-django-app -w
+kubectl get pods --all-namespaces
 ```
 
-> 🔐 **Секрети.** Значення `SECRET_KEY`/`DATABASE_PASSWORD` не зберігаються у `values.yaml`.
-> Передавайте їх через `--set` або git-ignored файл `-f secrets.values.yaml`.
-
-## Порядок вимкнення (важливо!)
+### 5️⃣ Create ECR Credentials Secret
 
 ```bash
-# 1. Прибрати застосунок і ELB (поки кластер живий)
-helm uninstall django-app
-aws elb describe-load-balancers --region us-east-1 --query 'LoadBalancerDescriptions[].LoadBalancerName'  # має бути порожньо
+# Jenkins needs this to push images to ECR
+./create-ecr-secret.sh
 
-# 2. Якщо бекенд був на S3 — мігрувати стейт у локальний, поки бакет існує
-#    (закоментувати backend "s3" → terraform init -migrate-state)
+# OR manually:
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+AWS_REGION="us-east-1"
+ECR_PASSWORD=$(aws ecr get-login-password --region ${AWS_REGION})
 
-# 3. Знищити інфраструктуру
-terraform destroy
+kubectl create secret docker-registry aws-ecr-credentials \
+  --docker-server=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com \
+  --docker-username=AWS \
+  --docker-password=${ECR_PASSWORD} \
+  --namespace=jenkins
 ```
 
-> ⚠️ Спершу `helm uninstall` — інакше залишковий ELB (створений Kubernetes, а не Terraform)
-> заблокує видалення VPC і `terraform destroy` зависне.
+### 6️⃣ Access Jenkins
 
-## Вартість
+```bash
+# Port-forward (in separate terminal)
+kubectl port-forward -n jenkins svc/jenkins 8080:80
 
-Безкоштовні в простої: VPC, підмережі, IGW, маршрути, порожній ECR, DynamoDB (`PAY_PER_REQUEST`).
+# Get admin password
+terraform output -raw jenkins_admin_password
 
-**Платні** (вмикаються разом з EKS-частиною):
+# Open browser
+open http://localhost:8080
+```
 
-| Ресурс | Орієнтовно |
-|--------|-----------|
-| EKS control plane | ~$0.10/год (~$73/міс) |
-| Вузли (2× t3.medium) | ~$60/міс |
-| LoadBalancer (ELB) | ~$18/міс + трафік |
-| NAT Gateway | ~$32/міс + плата за трафік |
+**Login:**
+- Username: `admin`
+- Password: (from terraform output)
 
-Тому після експериментів обов'язково робіть `terraform destroy` (та `helm uninstall` перед ним).
-NAT Gateway можна вимкнути окремо (`enable_nat_gateway = false`), але тоді вузли в приватних
-підмережах втратять вихід в інтернет — тож вимикайте лише разом з усім кластером.
+### 7️⃣ Configure Jenkins Pipeline
+
+**Add GitHub Credentials:**
+1. Jenkins → Manage Jenkins → Credentials
+2. Add: Username with password
+   - Username: Your GitHub username
+   - Password: [GitHub Personal Access Token](https://github.com/settings/tokens)
+   - ID: `github-credentials` (exactly!)
+   - Scopes needed: `repo`, `admin:repo_hook`
+
+**Create Pipeline Job:**
+1. New Item → `django-app-pipeline` → Pipeline
+2. Build Triggers: ✅ GitHub hook trigger
+3. Pipeline:
+   - Definition: Pipeline script from SCM
+   - SCM: Git
+   - Repository: `https://github.com/VladSmorodsky/my-microservice-project`
+   - Credentials: `github-credentials`
+   - Branch: `*/main`
+   - Script Path: `Jenkinsfile`
+4. Save
+
+### 8️⃣ Access ArgoCD
+
+```bash
+# Port-forward (in separate terminal)
+kubectl port-forward -n argocd svc/argocd-server 8081:80
+
+# Get admin password
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d
+
+# Open browser
+open http://localhost:8081
+```
+
+**Login:**
+- Username: `admin`
+- Password: (from command above)
+
+### 9️⃣ Test CI/CD Pipeline
+
+```bash
+# Trigger pipeline by pushing to main
+echo "test" >> README.md
+git add README.md
+git commit -m "test: trigger CI/CD"
+git push origin main
+
+# Jenkins automatically:
+# 1. Builds Docker image
+# 2. Pushes to ECR with tag BUILD_NUMBER
+# 3. Updates helm/django-app/values.yaml
+# 4. Commits and pushes to Git
+
+# ArgoCD automatically (~3 min):
+# 1. Detects Git changes
+# 2. Syncs Helm chart
+# 3. Deploys to Kubernetes
+```
+
+### 🔟 Access Application
+
+```bash
+# Get LoadBalancer URL
+kubectl get svc -n default django-app-django-app
+
+# OR
+terraform output
+```
+
+**Open:** `http://<EXTERNAL-IP>`
+
+> ⚠️ App returns HTTP 500 (no database configured), but CI/CD pipeline works!
+
+---
+
+## 🔐 Secrets Management
+
+**Current state:** Demo secrets in `values.yaml` (⚠️ NOT secure for production)
+
+**For production, use:**
+- [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets)
+- [External Secrets Operator](https://external-secrets.io/)
+- AWS Secrets Manager
+- HashiCorp Vault
+
+See [SECRETS_MANAGEMENT.md](SECRETS_MANAGEMENT.md) for details.
+
+---
+
+## 📊 Pipeline Details
+
+### Jenkinsfile Stages
+
+**Stage 1: Checkout Source** (~10s)
+- Clones Git repository
+
+**Stage 2: Build Docker Image** (~2-5 min)
+- Runs in Kaniko container (rootless)
+- Builds from `django/Dockerfile`
+- Pushes to ECR with tags: `BUILD_NUMBER` and `latest`
+
+**Stage 3: Update Helm Values** (~10s)
+- Runs in Git container
+- Clones repository
+- Updates `helm/django-app/values.yaml` with new image tag
+- Commits and pushes to `main` branch
+
+### ArgoCD Application
+
+**Configuration:**
+- Repository: `https://github.com/VladSmorodsky/my-microservice-project`
+- Path: `helm/django-app`
+- Branch: `main`
+- Sync Policy: Automated
+  - Prune: true
+  - Self-heal: true
+- Sync Interval: ~3 minutes
+
+---
+
+## 🛠️ Troubleshooting
+
+### Jenkins not responding
+
+```bash
+# Restart port-forward
+pkill -f "port-forward.*jenkins"
+kubectl port-forward -n jenkins svc/jenkins 8080:80
+```
+
+### Pipeline fails on ECR push
+
+```bash
+# ECR token expires every 12 hours
+# Recreate secret
+./create-ecr-secret.sh
+```
+
+### ArgoCD not syncing
+
+```bash
+# Check application status
+kubectl get application django-app -n argocd
+
+# Force sync
+kubectl patch application django-app -n argocd \
+  --type merge \
+  -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+```
+
+### Pods in CrashLoopBackOff
+
+```bash
+# Check logs
+kubectl logs -n default <pod-name>
+
+# Check events
+kubectl describe pod -n default <pod-name>
+
+# Common issue: missing database
+# Django needs PostgreSQL or use SQLite for demo
+```
+
+### Image pull errors
+
+```bash
+# Create ECR secret in default namespace
+kubectl create secret docker-registry ecr-registry-secret \
+  --docker-server=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com \
+  --docker-username=AWS \
+  --docker-password=$(aws ecr get-login-password --region us-east-1) \
+  --namespace=default
+```
+
+---
+
+## 🧹 Cleanup
+
+```bash
+# 1. Delete Helm releases first
+helm uninstall django-app
+
+# 2. Wait for LoadBalancer to be deleted
+kubectl get svc --all-namespaces | grep LoadBalancer
+
+# 3. Destroy infrastructure
+terraform destroy
+
+# Confirm: yes
+```
+
+**Order matters!** Helm creates LoadBalancer (not Terraform), so delete it first.
+
+---
+
+## 📚 Additional Documentation
+
+- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) - Detailed step-by-step guide
+- [SECRETS_MANAGEMENT.md](SECRETS_MANAGEMENT.md) - Security best practices
+- [JENKINS_ARGOCD_SETUP.md](JENKINS_ARGOCD_SETUP.md) - CI/CD configuration details
+
+---
+
+## 🎯 Learning Outcomes
+
+This project demonstrates:
+
+✅ **Infrastructure as Code** - Terraform modules
+✅ **Container Orchestration** - Kubernetes (EKS)
+✅ **CI/CD Pipeline** - Jenkins + ArgoCD
+✅ **GitOps** - Declarative deployments
+✅ **Security** - Secrets management, RBAC
+✅ **Monitoring** - Readiness/Liveness probes
+✅ **Scaling** - Horizontal Pod Autoscaler
+✅ **Networking** - VPC, subnets, LoadBalancer
+✅ **Container Registry** - ECR with scanning
+
+---

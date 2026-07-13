@@ -58,12 +58,13 @@ config:
   DATABASE_HOST: "localhost"
   DATABASE_PORT: "5432"
 
-# Sensitive environment variables — rendered into a Kubernetes Secret.
-# Do NOT put real values here / commit them. Pass them at install time, e.g.:
-#   helm install django-app helm/django-app \
-#     --set secrets.SECRET_KEY="$SECRET_KEY" \
-#     --set secrets.DATABASE_PASSWORD="$DATABASE_PASSWORD"
-# or via a separate, git-ignored file:  -f secrets.values.yaml
-secrets:
-  SECRET_KEY: ""
-  DATABASE_PASSWORD: ""
+# Secrets are created EXTERNALLY (not managed by Helm)
+#
+# Create once before deploying:
+#   ./create-django-secrets.sh
+#
+# This creates a Kubernetes Secret manually, not stored in Git.
+# Helm will use the existing Secret (not create it).
+#
+# For production alternatives, see SECRETS_MANAGEMENT.md
+secrets: {}  # Empty - use external Secret
