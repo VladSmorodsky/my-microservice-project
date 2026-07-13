@@ -94,7 +94,7 @@ spec:
                                 cd helm-charts
                                 git checkout ${HELM_REPO_BRANCH}
 
-                                sed -i 's|tag:.*|tag: "${IMAGE_TAG}"|g' ${VALUES_FILE_PATH}
+                                sed -i "s|tag:.*|tag: ${IMAGE_TAG}|g" ${VALUES_FILE_PATH}
 
                                 git diff ${VALUES_FILE_PATH}
 
