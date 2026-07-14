@@ -459,12 +459,3 @@ terraform init
 terraform plan
 terraform apply
 ```
-
----
-
-## 📚 Корисні посилання
-
-- [AWS RDS Documentation](https://docs.aws.amazon.com/rds/)
-- [AWS Aurora Documentation](https://docs.aws.amazon.com/aurora/)
-- [Terraform AWS Provider - RDS](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance)
-- [Terraform AWS Provider - Aurora](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/rds_cluster)
