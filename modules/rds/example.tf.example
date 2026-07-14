@@ -1,0 +1,152 @@
+# Приклад використання модуля RDS
+# Цей файл ТІЛЬКИ для документації - не включати в terraform apply!
+
+# 1. Standard RDS PostgreSQL (Production)
+module "rds_production" {
+  source = "../../modules/rds" # Відносний шлях від root проєкту
+
+  name                   = "myapp-prod-db"
+  use_aurora             = false
+
+  # Database
+  engine                 = "postgres"
+  engine_version         = "14.7"
+  instance_class         = "db.t3.medium"
+  allocated_storage      = 100
+
+  db_name                = "myapp"
+  username               = "admin"
+  password               = var.db_password_prod # Sensitive!
+
+  # Network
+  vpc_id                 = module.vpc.vpc_id
+  subnet_private_ids     = module.vpc.private_subnet_ids
+  subnet_public_ids      = []
+  publicly_accessible    = false
+  allowed_cidr_blocks    = ["10.0.0.0/16"] # VPC CIDR
+
+  # HA
+  multi_az               = true
+  backup_retention_period = 14
+
+  # Custom parameters
+  parameter_group_family_rds = "postgres14"
+  parameters = {
+    "max_connections"        = "200"
+    "shared_buffers"         = "512MB"
+    "effective_cache_size"   = "2GB"
+    "maintenance_work_mem"   = "128MB"
+    "work_mem"               = "4MB"
+  }
+
+  tags = {
+    Environment = "production"
+    Project     = "my-app"
+    ManagedBy   = "terraform"
+  }
+}
+
+# 2. Aurora Cluster (High-traffic production)
+module "rds_aurora" {
+  source = "./modules/rds"
+
+  name                   = "myapp-aurora"
+  use_aurora             = true
+
+  # Aurora
+  engine_cluster         = "aurora-postgresql"
+  engine_version_cluster = "15.3"
+  instance_class         = "db.r5.large"
+  aurora_replica_count   = 2 # 1 writer + 2 readers
+
+  db_name                = "myapp"
+  username               = "admin"
+  password               = var.db_password_aurora
+
+  # Network
+  vpc_id                 = module.vpc.vpc_id
+  subnet_private_ids     = module.vpc.private_subnet_ids
+  subnet_public_ids      = []
+  publicly_accessible    = false
+  allowed_cidr_blocks    = ["10.0.0.0/16"]
+
+  # Backup
+  backup_retention_period = 30
+
+  # Custom parameters
+  parameter_group_family_aurora = "aurora-postgresql15"
+  parameters = {
+    "shared_preload_libraries" = "pg_stat_statements"
+    "max_connections"          = "1000"
+  }
+
+  tags = {
+    Environment = "production"
+    Project     = "my-app"
+    Type        = "aurora"
+  }
+}
+
+# 3. Dev Database (Cost-optimized)
+module "rds_dev" {
+  source = "./modules/rds"
+
+  name                   = "myapp-dev"
+  use_aurora             = false
+
+  engine                 = "postgres"
+  engine_version         = "14.7"
+  instance_class         = "db.t3.micro" # Cheapest
+  allocated_storage      = 20
+
+  db_name                = "myapp_dev"
+  username               = "devadmin"
+  password               = var.db_password_dev
+
+  # Network - public для dev
+  vpc_id                 = module.vpc.vpc_id
+  subnet_private_ids     = []
+  subnet_public_ids      = module.vpc.public_subnet_ids
+  publicly_accessible    = true
+  allowed_cidr_blocks    = ["0.0.0.0/0"] # ⚠️ Only for dev!
+
+  # Minimal backup
+  multi_az               = false
+  backup_retention_period = 1
+
+  tags = {
+    Environment = "development"
+  }
+}
+
+# Outputs
+output "prod_db_endpoint" {
+  description = "Production DB endpoint"
+  value       = module.rds_production.rds_endpoint
+}
+
+output "aurora_writer_endpoint" {
+  description = "Aurora writer endpoint"
+  value       = module.rds_aurora.aurora_cluster_endpoint
+}
+
+output "aurora_reader_endpoint" {
+  description = "Aurora reader endpoint"
+  value       = module.rds_aurora.aurora_cluster_reader_endpoint
+}
+
+output "dev_db_endpoint" {
+  description = "Development DB endpoint"
+  value       = module.rds_dev.rds_endpoint
+}
+
+# Connection strings (sensitive)
+output "prod_connection_string" {
+  value     = module.rds_production.connection_string
+  sensitive = true
+}
+
+output "aurora_connection_string" {
+  value     = module.rds_aurora.connection_string
+  sensitive = true
+}

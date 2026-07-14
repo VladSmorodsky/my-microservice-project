@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: 590183992909.dkr.ecr.us-east-1.amazonaws.com/my-app
-  tag: latest
+  tag: "7" # Оновлено для відповідності ArgoCD deployment
   pullPolicy: IfNotPresent
 
 imagePullSecrets:
@@ -53,10 +53,12 @@ readinessProbe:
 config:
   DEBUG: "False"
   ALLOWED_HOSTS: "*"
-  DATABASE_NAME: "docker_project"
-  DATABASE_USER: "myuser"
-  DATABASE_HOST: "localhost"
+  # RDS Aurora PostgreSQL Connection
+  DATABASE_NAME: "myapp"
+  DATABASE_USER: "postgres"
+  DATABASE_HOST: "myapp-db-cluster.cluster-cw944cass5p4.us-east-1.rds.amazonaws.com"
   DATABASE_PORT: "5432"
+  DATABASE_ENGINE: "django.db.backends.postgresql"
 
 # Secrets are created EXTERNALLY (not managed by Helm)
 #
