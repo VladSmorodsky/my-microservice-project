@@ -75,3 +75,19 @@ output "argocd_admin_password_command" {
   description = "Command to get ArgoCD admin password"
   value       = module.argo_cd.argocd_admin_password_command
 }
+
+# RDS Outputs
+output "rds_endpoint" {
+  description = "Database host for Django DATABASE_HOST (Aurora writer or standard RDS)"
+  value       = try(coalesce(module.rds.aurora_cluster_endpoint, module.rds.rds_address), null)
+}
+
+output "rds_port" {
+  description = "Database port"
+  value       = module.rds.db_port
+}
+
+output "rds_db_name" {
+  description = "Database name"
+  value       = module.rds.db_name
+}

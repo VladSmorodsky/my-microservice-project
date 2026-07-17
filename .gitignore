@@ -249,3 +249,6 @@ override.tf.json
 secrets.values.yaml
 *.secrets.yaml
 secret.values.yaml
+
+# Backup files (can contain state/passwords)
+*.backup

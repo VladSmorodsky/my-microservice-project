@@ -17,9 +17,9 @@ resource "helm_release" "jenkins" {
   version          = var.chart_version
   create_namespace = true
 
-  timeout          = 1200 # 20 хвилин (збільшено з дефолтних 5 хв)
-  wait             = true
-  wait_for_jobs    = true
+  timeout       = 1200 # 20 хвилин (збільшено з дефолтних 5 хв)
+  wait          = true
+  wait_for_jobs = true
 
   values = [
     templatefile("${path.module}/values.yaml", {
