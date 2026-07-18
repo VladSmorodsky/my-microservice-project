@@ -37,16 +37,17 @@ data "aws_eks_cluster" "eks" {
   depends_on = [module.eks]
 }
 
-data "aws_eks_cluster_auth" "eks" {
-  name       = module.eks.cluster_name
-  depends_on = [module.eks]
-}
-
-# Kubernetes provider
+# Kubernetes provider — exec auth fetches a FRESH token on every call,
+# so long applies (EKS + Aurora take ~25 min) don't hit token expiry.
 provider "kubernetes" {
   host                   = data.aws_eks_cluster.eks.endpoint
   cluster_ca_certificate = base64decode(data.aws_eks_cluster.eks.certificate_authority[0].data)
-  token                  = data.aws_eks_cluster_auth.eks.token
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", "us-east-1"]
+  }
 }
 
 # Helm provider
@@ -54,7 +55,12 @@ provider "helm" {
   kubernetes {
     host                   = data.aws_eks_cluster.eks.endpoint
     cluster_ca_certificate = base64decode(data.aws_eks_cluster.eks.certificate_authority[0].data)
-    token                  = data.aws_eks_cluster_auth.eks.token
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--region", "us-east-1"]
+    }
   }
 }
 
@@ -104,19 +110,19 @@ module "argo_cd" {
 module "rds" {
   source = "./modules/rds"
 
-  name                  = "myapp-db"
-  use_aurora            = true
-  aurora_replica_count  = 1 # Кількість reader replicas (1 writer + 1 reader)
+  name                 = "myapp-db"
+  use_aurora           = false
+  aurora_replica_count = 1 # Кількість reader replicas (1 writer + 1 reader)
 
   # --- Aurora-only ---
   engine_cluster                = "aurora-postgresql"
-  engine_version_cluster        = "15.17" # Оновлено на доступну версію
+  engine_version_cluster        = "15.17"
   parameter_group_family_aurora = "aurora-postgresql15"
 
 
   # --- RDS-only ---
   engine                     = "postgres"
-  engine_version             = "17.2"
+  engine_version             = "17" # мажорна версія — AWS сам обере доступний мінор
   parameter_group_family_rds = "postgres17"
 
   # Common
@@ -124,7 +130,7 @@ module "rds" {
   allocated_storage       = 20
   db_name                 = "myapp"
   username                = "postgres"
-  password                = "admin123AWS23"
+  password                = var.db_password
   subnet_private_ids      = module.vpc.private_subnets
   subnet_public_ids       = module.vpc.public_subnets
   publicly_accessible     = true

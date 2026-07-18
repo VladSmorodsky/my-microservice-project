@@ -34,11 +34,11 @@ resource "aws_iam_role_policy_attachment" "ebs_irsa_policy" {
 
 # EKS Addon з прив'язаною IRSA IAM роллю
 resource "aws_eks_addon" "ebs_csi_driver" {
-  cluster_name                 = aws_eks_cluster.this.name
-  addon_name                   = "aws-ebs-csi-driver"
-  addon_version                = var.ebs_csi_driver_version
-  service_account_role_arn     = aws_iam_role.ebs_csi_irsa_role.arn
-  resolve_conflicts_on_update  = "PRESERVE"
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "aws-ebs-csi-driver"
+  addon_version               = var.ebs_csi_driver_version
+  service_account_role_arn    = aws_iam_role.ebs_csi_irsa_role.arn
+  resolve_conflicts_on_update = "PRESERVE"
 
   depends_on = [
     aws_iam_openid_connect_provider.oidc,
