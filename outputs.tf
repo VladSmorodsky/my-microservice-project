@@ -91,3 +91,25 @@ output "rds_db_name" {
   description = "Database name"
   value       = module.rds.db_name
 }
+
+# Monitoring Outputs
+output "grafana_admin_user" {
+  description = "Grafana admin username"
+  value       = module.monitoring.grafana_admin_user
+}
+
+output "grafana_admin_password" {
+  description = "Grafana admin password"
+  value       = module.monitoring.grafana_admin_password
+  sensitive   = true
+}
+
+output "grafana_url_command" {
+  description = "Command to get Grafana external address"
+  value       = module.monitoring.grafana_url_command
+}
+
+output "prometheus_portforward_command" {
+  description = "Command to access Prometheus UI locally"
+  value       = module.monitoring.prometheus_portforward_command
+}

@@ -28,6 +28,11 @@ module "eks" {
 
   node_subnet_ids = module.vpc.private_subnets
 
+  node_instance_types = ["t3.large"]
+  desired_size        = 2
+  min_size            = 1
+  max_size            = 3
+
   environment = var.environment
 }
 
@@ -69,6 +74,32 @@ resource "random_password" "jenkins_admin" {
   length           = 20
   special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+# Random password for Grafana admin
+resource "random_password" "grafana_admin" {
+  length           = 20
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+# Prometheus + Grafana (kube-prometheus-stack)
+module "monitoring" {
+  source       = "./modules/monitoring"
+  cluster_name = module.eks.cluster_name
+
+  namespace              = "monitoring"
+  grafana_admin_user     = "admin"
+  grafana_admin_password = random_password.grafana_admin.result
+  grafana_service_type   = "LoadBalancer"
+  storage_class          = "gp2"
+
+  providers = {
+    helm       = helm
+    kubernetes = kubernetes
+  }
+
+  depends_on = [module.eks]
 }
 
 # Jenkins
