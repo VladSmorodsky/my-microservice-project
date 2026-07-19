@@ -1,7 +1,7 @@
 controller:
   admin:
-    username: ${admin_user}
-    password: ${admin_password}
+    username: "${admin_user}"
+    password: "${admin_password}"
 
   containerEnv:
     - name: ECR_REPOSITORY_URL
