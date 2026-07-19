@@ -564,3 +564,57 @@ terraform destroy
 - [JENKINS_ARGOCD_SETUP.md](JENKINS_ARGOCD_SETUP.md) - CI/CD configuration details
 
 ---
+
+## ✅ Перевірка після змін (Verification)
+
+Нижче — скріншоти успішного проходження перевірок та пост-деплойменту після
+внесених змін (приватна RDS, TF-керований Secret, initContainer міграцій,
+metrics-server, проби на `/doctor`, де-хардкод ECR у Jenkins).
+
+### 1. Terraform: format & validate
+
+`terraform fmt -recursive` (без змін) → `terraform fmt -check -recursive` (exit 0) →
+`terraform validate` → **Success! The configuration is valid.**
+
+![terraform fmt / fmt -check / validate](report_screenshots/Screenshot%202026-07-19%20at%2012.32.42.png)
+
+### 2. Підключення до кластера та вузли
+
+`aws eks update-kubeconfig --region us-east-1 --name my-eks` → `kubectl get nodes`
+— 2× `t3.large` у стані **Ready** (EKS v1.36).
+
+![kubectl get nodes](report_screenshots/Screenshot%202026-07-19%20at%2013.34.36.png)
+
+### 3. Jenkins
+
+`kubectl get pods -n jenkins` — `jenkins-0` **2/2 Running**.
+
+![kubectl get pods -n jenkins](report_screenshots/Screenshot%202026-07-19%20at%2013.34.56.png)
+
+### 4. ArgoCD
+
+`kubectl get pods -n argocd` — усі 5 подів **Running**.
+
+![kubectl get pods -n argocd](report_screenshots/Screenshot%202026-07-19%20at%2013.35.15.png)
+
+### 5. Застосунок (namespace `default`)
+
+`kubectl get pods -n default` — 2 поди `django-app` **Running 1/1** (після заливки образу).
+
+![kubectl get pods -n default](report_screenshots/Screenshot%202026-07-19%20at%2013.46.06.png)
+
+`kubectl get svc -n default` — `django-app` типу **LoadBalancer** із зовнішнім ELB.
+
+![kubectl get svc -n default](report_screenshots/Screenshot%202026-07-19%20at%2013.46.26.png)
+
+`kubectl get hpa -n default` — **`cpu: 0%/70%`** (не `<unknown>` — metrics-server працює), 2/6 реплік.
+
+![kubectl get hpa -n default](report_screenshots/Screenshot%202026-07-19%20at%2013.46.44.png)
+
+### 6. Метрики вузлів
+
+`kubectl top nodes` — metrics-server віддає CPU/пам'ять (підтверджує, що HPA має джерело метрик).
+
+![kubectl top nodes](report_screenshots/Screenshot%202026-07-19%20at%2013.45.29.png)
+
+---
