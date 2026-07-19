@@ -33,10 +33,10 @@ spec:
     }
 
     environment {
-        AWS_REGION = 'us-east-1'
-        AWS_ACCOUNT_ID = '590183992909'
-        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        IMAGE_NAME = 'my-app'
+        AWS_REGION = "${env.AWS_REGION ?: 'us-east-1'}"
+        ECR_REPOSITORY_URL = "${env.ECR_REPOSITORY_URL ?: '590183992909.dkr.ecr.us-east-1.amazonaws.com/my-app'}"
+        ECR_REGISTRY = "${ECR_REPOSITORY_URL.tokenize('/')[0]}"
+        IMAGE_NAME = "${ECR_REPOSITORY_URL.substring(ECR_REPOSITORY_URL.indexOf('/') + 1)}"
         IMAGE_TAG = "${env.BUILD_NUMBER}"
         HELM_REPO_URL = 'github.com/VladSmorodsky/my-microservice-project'
         HELM_REPO_BRANCH = 'main'

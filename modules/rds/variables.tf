@@ -93,9 +93,15 @@ variable "publicly_accessible" {
 }
 
 variable "allowed_cidr_blocks" {
-  description = "CIDR blocks з яких дозволено підключення до RDS"
+  description = "CIDR blocks з яких дозволено підключення до RDS (краще тримати вузьким — лише VPC CIDR)"
   type        = list(string)
-  default     = ["10.0.0.0/8"] # Private networks by default
+  default     = []
+}
+
+variable "allowed_security_group_ids" {
+  description = "Security group IDs, яким дозволено підключення до RDS (напр. SG кластера EKS) — найточніший спосіб"
+  type        = list(string)
+  default     = []
 }
 
 variable "multi_az" {

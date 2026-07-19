@@ -3,6 +3,12 @@ controller:
     username: ${admin_user}
     password: ${admin_password}
 
+  containerEnv:
+    - name: ECR_REPOSITORY_URL
+      value: "${ecr_repository_url}"
+    - name: AWS_REGION
+      value: "${aws_region}"
+
   serviceType: ${service_type}
   servicePort: 80
   service:

@@ -44,3 +44,15 @@ variable "service_type" {
   type        = string
   default     = "LoadBalancer"
 }
+
+variable "ecr_repository_url" {
+  description = "URL ECR-репозиторію (з module.ecr) — підставляється в Jenkins як env для пайплайна"
+  type        = string
+  default     = ""
+}
+
+variable "aws_region" {
+  description = "AWS регіон для пайплайна"
+  type        = string
+  default     = "us-east-1"
+}

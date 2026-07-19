@@ -69,6 +69,19 @@ provider "helm" {
   }
 }
 
+resource "helm_release" "metrics_server" {
+  name       = "metrics-server"
+  repository = "https://kubernetes-sigs.github.io/metrics-server"
+  chart      = "metrics-server"
+  version    = "3.12.2"
+  namespace  = "kube-system"
+
+  timeout = 300
+  wait    = true
+
+  depends_on = [module.eks]
+}
+
 # Random password for Jenkins admin
 resource "random_password" "jenkins_admin" {
   length           = 20
@@ -112,6 +125,8 @@ module "jenkins" {
   admin_password = random_password.jenkins_admin.result
   storage_class  = "gp2"
   service_type   = "LoadBalancer"
+
+  ecr_repository_url = module.ecr.repository_url
   providers = {
     helm       = helm
     kubernetes = kubernetes
@@ -153,19 +168,24 @@ module "rds" {
 
   # --- RDS-only ---
   engine                     = "postgres"
-  engine_version             = "17" # мажорна версія — AWS сам обере доступний мінор
+  engine_version             = "17"
   parameter_group_family_rds = "postgres17"
 
   # Common
-  instance_class          = "db.t3.medium"
-  allocated_storage       = 20
-  db_name                 = "myapp"
-  username                = "postgres"
-  password                = var.db_password
-  subnet_private_ids      = module.vpc.private_subnets
-  subnet_public_ids       = module.vpc.public_subnets
-  publicly_accessible     = true
-  vpc_id                  = module.vpc.vpc_id
+  instance_class    = "db.t3.medium"
+  allocated_storage = 20
+  db_name           = "myapp"
+  username          = "postgres"
+  password          = var.db_password
+
+  subnet_private_ids  = module.vpc.private_subnets
+  subnet_public_ids   = []
+  publicly_accessible = false
+  vpc_id              = module.vpc.vpc_id
+
+  allowed_cidr_blocks        = [module.vpc.vpc_cidr_block]
+  allowed_security_group_ids = [module.eks.cluster_security_group_id]
+
   multi_az                = true
   backup_retention_period = 7
   parameters = {
@@ -177,4 +197,27 @@ module "rds" {
     Environment = "dev"
     Project     = "myapp"
   }
+}
+
+resource "random_password" "django_secret_key" {
+  length  = 50
+  special = false
+}
+
+resource "kubernetes_secret_v1" "django_db" {
+  metadata {
+    name      = "django-app-django-app-secret"
+    namespace = "default"
+  }
+
+  type = "Opaque"
+
+  data = {
+    SECRET_KEY        = random_password.django_secret_key.result
+    DATABASE_PASSWORD = var.db_password
+    # Реальний ендпоінт standard RDS або Aurora — залежно від use_aurora
+    DATABASE_HOST = coalesce(module.rds.aurora_cluster_endpoint, module.rds.rds_address)
+  }
+
+  depends_on = [module.eks, module.rds]
 }

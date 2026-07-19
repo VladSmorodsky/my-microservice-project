@@ -29,9 +29,9 @@ resources:
     memory: 512Mi
 
 livenessProbe:
-  enabled: false
+  enabled: true
   httpGet:
-    path: /
+    path: /doctor
     port: http
   initialDelaySeconds: 15
   periodSeconds: 20
@@ -39,9 +39,9 @@ livenessProbe:
   failureThreshold: 3
 
 readinessProbe:
-  enabled: false
+  enabled: true
   httpGet:
-    path: /
+    path: /doctor
     port: http
   initialDelaySeconds: 10
   periodSeconds: 10
@@ -53,10 +53,11 @@ readinessProbe:
 config:
   DEBUG: "False"
   ALLOWED_HOSTS: "*"
-  # RDS Aurora PostgreSQL Connection
+  # DB connection: static parts here; DATABASE_HOST + DATABASE_PASSWORD + SECRET_KEY
+  # come from the Kubernetes Secret that Terraform creates from RDS outputs
+  # (див. kubernetes_secret_v1.django_db у main.tf). Жодних захардкоджених ендпоінтів.
   DATABASE_NAME: "myapp"
   DATABASE_USER: "postgres"
-  DATABASE_HOST: "myapp-db-cluster.cluster-cw944cass5p4.us-east-1.rds.amazonaws.com"
   DATABASE_PORT: "5432"
   DATABASE_ENGINE: "django.db.backends.postgresql"
 

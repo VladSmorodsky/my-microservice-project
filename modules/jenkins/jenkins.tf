@@ -23,11 +23,13 @@ resource "helm_release" "jenkins" {
 
   values = [
     templatefile("${path.module}/values.yaml", {
-      admin_user     = var.admin_user
-      admin_password = var.admin_password
-      storage_class  = var.storage_class
-      service_type   = var.service_type
-      namespace      = var.namespace
+      admin_user         = var.admin_user
+      admin_password     = var.admin_password
+      storage_class      = var.storage_class
+      service_type       = var.service_type
+      namespace          = var.namespace
+      ecr_repository_url = var.ecr_repository_url
+      aws_region         = var.aws_region
     })
   ]
 }

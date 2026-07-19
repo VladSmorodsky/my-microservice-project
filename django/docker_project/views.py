@@ -1,6 +1,11 @@
 from django.http import HttpResponse
 
 
+def doctor(request):
+    """Lightweight health check for liveness/readiness probes."""
+    return HttpResponse("ok", content_type="text/plain", status=200)
+
+
 def home(request):
     """Home page view"""
     return HttpResponse("""

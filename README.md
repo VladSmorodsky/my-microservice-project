@@ -168,11 +168,23 @@ terraform output > outputs.txt
 ```
 
 **What gets created:**
-- VPC with 6 subnets across 3 AZs
-- EKS cluster (my-eks) with 2 t3.medium nodes
+- VPC with 6 subnets across 3 AZs + NAT Gateway (private nodes)
+- EKS cluster (my-eks) with 2× **t3.large** nodes
+- **EBS CSI driver** + **metrics-server** (HPA works out of the box)
 - ECR repository (my-app)
+- **RDS PostgreSQL** (private subnets, access only from the EKS security group)
 - Jenkins with Kaniko agents
 - ArgoCD with auto-sync enabled
+- **Prometheus + Grafana** (kube-prometheus-stack) for monitoring
+- **Django DB Secret** (`kubernetes_secret_v1`) auto-populated from RDS outputs
+
+> ℹ️ **Automated — no manual steps needed:**
+> - `metrics-server` is installed by Terraform (no manual `kubectl apply`).
+> - The Django Secret (`SECRET_KEY`, `DATABASE_PASSWORD`, `DATABASE_HOST`) is
+>   created by Terraform from the real RDS endpoint — no hardcoded host, no
+>   manual `kubectl create secret`, no `kubectl patch application ... DATABASE_HOST`.
+> - DB migrations run automatically via an **initContainer** in the Deployment —
+>   no manual `kubectl exec ... manage.py migrate`.
 
 ### 4️⃣ Configure kubectl
 
